@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp add:*)",
+      "mcp__uno__uno_platform_docs_search",
+      "mcp__uno__uno_platform_docs_fetch",
+      "Bash(Remove-Item \"C:\\Users\\Platform006\\source\\repos\\matrix\\matrix\\Transitions\\Matrix\\MatrixNavigatorExtensions.cs\")",
+      "Bash(powershell -Command \"Remove-Item ''C:\\Users\\Platform006\\source\\repos\\matrix\\matrix\\Transitions\\Matrix\\MatrixNavigatorExtensions.cs''\")",
+      "Bash(powershell -Command \"cd ''C:\\Users\\Platform006\\source\\repos\\matrix\\matrix''; dotnet build -f net9.0-desktop 2>&1\")",
+      "Bash(powershell -Command \"$env:DOTNET_MODIFIABLE_ASSEMBLIES = ''debug''; Start-Job { dotnet run -f net9.0-desktop --project ''C:\\Users\\Platform006\\source\\repos\\matrix\\matrix\\matrix.csproj'' }\")",
+      "Bash(powershell -Command \"Receive-Job -Id 1 -Keep 2>&1\")",
+      "Bash(powershell:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

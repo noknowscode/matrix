@@ -1,0 +1,55 @@
+﻿<Page x:Class="matrix.Presentation.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:matrix.Presentation"
+      xmlns:uen="using:Uno.Extensions.Navigation.UI"
+      xmlns:utu="using:Uno.Toolkit.UI"
+      xmlns:um="using:Uno.Material"
+      NavigationCacheMode="Required"
+      Background="{ThemeResource BackgroundBrush}">
+  <ScrollViewer IsTabStop="True">
+    <Grid utu:SafeArea.Insets="VisibleBounds">
+      <StackPanel HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="24">
+        <Button AutomationProperties.AutomationId="SecondPageButton"
+            Command="{Binding GoToSecond}"
+            MinWidth="160"
+            MinHeight="48"
+            CornerRadius="24">
+          <Button.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#FF4444" Offset="0" />
+              <GradientStop Color="#CC0000" Offset="1" />
+            </LinearGradientBrush>
+          </Button.Background>
+          <TextBlock Text="Red Pill" Foreground="White" FontWeight="SemiBold" />
+        </Button>
+        <Button Command="{Binding GoToSecondSlow}"
+            MinWidth="160"
+            MinHeight="48"
+            CornerRadius="24">
+          <Button.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#4488FF" Offset="0" />
+              <GradientStop Color="#0044CC" Offset="1" />
+            </LinearGradientBrush>
+          </Button.Background>
+          <TextBlock Text="Blue Pill" Foreground="White" FontWeight="SemiBold" />
+        </Button>
+        <Button Command="{Binding LoopMatrix}"
+            MinWidth="160"
+            MinHeight="48"
+            CornerRadius="24">
+          <Button.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#44FF44" Offset="0" />
+              <GradientStop Color="#00AA00" Offset="1" />
+            </LinearGradientBrush>
+          </Button.Background>
+          <TextBlock Text="Matrix Loop" Foreground="White" FontWeight="SemiBold" />
+        </Button>
+      </StackPanel>
+    </Grid>
+  </ScrollViewer>
+</Page>

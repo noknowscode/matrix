@@ -1,0 +1,10 @@
+{
+  "background_color": "#ffffff",
+  "description": "matrix",
+  "display": "standalone",
+  "name": "matrix",
+  "short_name": "matrix",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/"
+}
