@@ -23,20 +23,17 @@ internal class DebugHttpHandler : DelegatingHandler
             {
                 _logger.LogDebugMessage($"{request.RequestUri} ({request.Method})");
             }
-            
-            foreach ((var key, var values) in request.Headers.ToDictionary(x => x.Key, x => string.Join(", ", x.Value)))
+
+            foreach (var header in request.Headers)
             {
-                _logger.LogDebugMessage($"{key}: {values}");
+                _logger.LogDebugMessage($"{header.Key}: {string.Join(", ", header.Value)}");
             }
 
-            var content = request.Content is not null ? await request.Content.ReadAsStringAsync() : null;
+            var content = request.Content is not null ? await request.Content.ReadAsStringAsync(cancellationToken) : null;
             if (!string.IsNullOrEmpty(content))
             {
                 _logger.LogDebugMessage(content);
             }
-
-            // Uncomment to automatically break when an API call fails while debugging
-            // System.Diagnostics.Debugger.Break();
         }
 #endif
         return response;

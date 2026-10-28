@@ -1,3 +1,4 @@
+using System.Reflection;
 using SkiaSharp;
 
 namespace matrix.Transitions.Matrix;
@@ -14,10 +15,25 @@ public sealed class MatrixRainRenderer : IDisposable
     private float _elapsedMs;
     private readonly Random _random = new();
 
+    private float _cursorX = -1000;
+    private float _cursorY = -1000;
+    private const float LogoSize = 350f;
+
+    private SKBitmap? _logoMask;
+
     private SKPaint? _headPaint;
     private SKPaint? _trailPaint;
     private SKFont? _font;
     private SKTypeface? _typeface;
+
+    // 8-neighborhood sample offsets for border detection. Static to avoid per-call array allocation.
+    private static readonly int[] BorderSampleDx = [-1, 0, 1, -1, 1, -1, 0, 1];
+    private static readonly int[] BorderSampleDy = [-1, -1, -1, 0, 0, 1, 1, 1];
+
+    // Cached single-char strings for the active character set; rebuilt only when the set changes.
+    // Eliminates per-frame char.ToString() allocations in Render().
+    private string[]? _charStrings;
+    private string? _cachedCharacterSet;
 
     public event Action<TransitionPhase>? PhaseChanged;
     public event Action? TransitionCompleted;
@@ -31,10 +47,9 @@ public sealed class MatrixRainRenderer : IDisposable
         _screenHeight = height;
         _options = options;
 
-        // Only create resources if not already created
         if (_typeface == null)
         {
-            // Prefer fonts with good Katakana support, fallback to monospace
+            // Prefer fonts with good Katakana support; fall back to monospace.
             _typeface = SKTypeface.FromFamilyName("MS Gothic", SKFontStyle.Bold)
                 ?? SKTypeface.FromFamilyName("Hiragino Kaku Gothic Pro", SKFontStyle.Bold)
                 ?? SKTypeface.FromFamilyName("Noto Sans JP", SKFontStyle.Bold)
@@ -55,6 +70,43 @@ public sealed class MatrixRainRenderer : IDisposable
                 Color = options.CharacterColor,
                 IsAntialias = true
             };
+
+            LoadLogoMask();
+        }
+
+        if (!ReferenceEquals(_cachedCharacterSet, options.CharacterSet))
+        {
+            var set = options.CharacterSet;
+            var strings = new string[set.Length];
+            for (int i = 0; i < set.Length; i++)
+            {
+                strings[i] = set[i].ToString();
+            }
+            _charStrings = strings;
+            _cachedCharacterSet = set;
+        }
+    }
+
+    private void LoadLogoMask()
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.Contains("Uno-logo", StringComparison.OrdinalIgnoreCase));
+
+            if (resourceName != null)
+            {
+                using var stream = assembly.GetManifestResourceStream(resourceName);
+                if (stream != null)
+                {
+                    _logoMask = SKBitmap.Decode(stream);
+                }
+            }
+        }
+        catch
+        {
+            // Logo mask is optional - scatter falls back to no deflection.
         }
     }
 
@@ -62,6 +114,12 @@ public sealed class MatrixRainRenderer : IDisposable
     {
         _screenWidth = width;
         _screenHeight = height;
+    }
+
+    public void SetCursorPosition(float x, float y)
+    {
+        _cursorX = x;
+        _cursorY = y;
     }
 
     public void Start(bool continuous = false)
@@ -109,7 +167,6 @@ public sealed class MatrixRainRenderer : IDisposable
             {
                 if (IsContinuousMode)
                 {
-                    // Respawn at top instead of deactivating
                     RespawnColumn(column);
                 }
                 else
@@ -127,11 +184,17 @@ public sealed class MatrixRainRenderer : IDisposable
 
     public void Render(SKCanvas canvas)
     {
-        if (_font == null || _headPaint == null || _trailPaint == null)
+        if (_font == null || _headPaint == null || _trailPaint == null || _charStrings == null)
             return;
 
-        foreach (var column in _columns.Where(c => c.IsActive))
+        var charStrings = _charStrings;
+
+        // Manual loop avoids Where() enumerator allocation each frame.
+        for (int cIdx = 0; cIdx < _columns.Count; cIdx++)
         {
+            var column = _columns[cIdx];
+            if (!column.IsActive) continue;
+
             for (int i = 0; i < column.Length; i++)
             {
                 float charY = column.Y - (i * _charHeight);
@@ -145,9 +208,10 @@ public sealed class MatrixRainRenderer : IDisposable
                 var baseColor = i == 0 ? _options.GlowColor : _options.CharacterColor;
                 paint.Color = baseColor.WithAlpha((byte)(alpha * 255));
 
+                var (offsetX, offsetY) = CalculateCharacterScatter(column.X, charY);
+
                 int charIndex = column.CharIndices[i % column.CharIndices.Length];
-                char c = _options.CharacterSet[charIndex];
-                canvas.DrawText(c.ToString(), column.X, charY, _font, paint);
+                canvas.DrawText(charStrings[charIndex], column.X + offsetX, charY + offsetY, _font, paint);
             }
         }
     }
@@ -158,6 +222,7 @@ public sealed class MatrixRainRenderer : IDisposable
         _trailPaint?.Dispose();
         _font?.Dispose();
         _typeface?.Dispose();
+        _logoMask?.Dispose();
     }
 
     private void SetPhase(TransitionPhase phase)
@@ -259,5 +324,113 @@ public sealed class MatrixRainRenderer : IDisposable
             charIndices[i] = _random.Next(0, _options.CharacterSet.Length);
         }
         column.CharIndices = charIndices;
+    }
+
+    private (float offsetX, float offsetY) CalculateCharacterScatter(float charX, float charY)
+    {
+        if (_logoMask == null)
+            return (0f, 0f);
+
+        float dx = charX - _cursorX;
+        float dy = charY - _cursorY;
+
+        float halfSize = LogoSize / 2f;
+        const float margin = 30f;
+        if (MathF.Abs(dx) > halfSize + margin || MathF.Abs(dy) > halfSize + margin)
+            return (0f, 0f);
+
+        float u = (dx + halfSize) / LogoSize;
+        float v = (dy + halfSize) / LogoSize;
+
+        int px = Math.Clamp((int)(u * _logoMask.Width), 0, _logoMask.Width - 1);
+        int py = Math.Clamp((int)(v * _logoMask.Height), 0, _logoMask.Height - 1);
+
+        const int borderWidth = 12;
+        var (isNearBorder, normalX, normalY) = CheckNearBorder(px, py, borderWidth);
+
+        if (!isNearBorder)
+            return (0f, 0f);
+
+        float scale = LogoSize / _logoMask.Width;
+
+        const float pushStrength = 25f;
+        float pushX = normalX * pushStrength * scale;
+        float pushY = normalY * pushStrength * scale;
+
+        // Slide along the border tangent that points downward, producing a "dripping" effect.
+        float tangentX = -normalY;
+        float tangentY = normalX;
+        if (tangentY < 0)
+        {
+            tangentX = -tangentX;
+            tangentY = -tangentY;
+        }
+
+        const float slideStrength = 15f;
+        pushX += tangentX * slideStrength * scale;
+        pushY += tangentY * slideStrength * scale;
+
+        return (pushX, pushY);
+    }
+
+    private bool IsLogoPixel(int px, int py)
+    {
+        if (_logoMask == null || px < 0 || py < 0 ||
+            px >= _logoMask.Width || py >= _logoMask.Height)
+            return false;
+
+        var pixel = _logoMask.GetPixel(px, py);
+        return pixel.Alpha > 20 &&
+            (pixel.Red < 240 || pixel.Green < 240 || pixel.Blue < 240);
+    }
+
+    private (bool isNearBorder, float normalX, float normalY) CheckNearBorder(int px, int py, int borderWidth)
+    {
+        bool isInside = IsLogoPixel(px, py);
+
+        float normalX = 0, normalY = 0;
+        bool foundEdge = false;
+
+        for (int checkDist = 1; checkDist <= borderWidth; checkDist++)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                int checkX = px + BorderSampleDx[i] * checkDist;
+                int checkY = py + BorderSampleDy[i] * checkDist;
+
+                bool checkInside = IsLogoPixel(checkX, checkY);
+
+                if (checkInside != isInside)
+                {
+                    // Normal points from logo toward outside.
+                    if (isInside)
+                    {
+                        normalX += BorderSampleDx[i];
+                        normalY += BorderSampleDy[i];
+                    }
+                    else
+                    {
+                        normalX -= BorderSampleDx[i];
+                        normalY -= BorderSampleDy[i];
+                    }
+                    foundEdge = true;
+                }
+            }
+
+            if (foundEdge)
+                break;
+        }
+
+        if (!foundEdge)
+            return (false, 0, 0);
+
+        float len = MathF.Sqrt(normalX * normalX + normalY * normalY);
+        if (len > 0.01f)
+        {
+            normalX /= len;
+            normalY /= len;
+        }
+
+        return (true, normalX, normalY);
     }
 }
