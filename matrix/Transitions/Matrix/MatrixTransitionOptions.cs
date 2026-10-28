@@ -13,7 +13,6 @@ public record MatrixTransitionOptions
     public SKColor CharacterColor { get; init; } = new(0, 255, 70);
     public SKColor GlowColor { get; init; } = SKColors.White;
 
-    // Katakana + digits + Latin - using standard Unicode that most fonts support
     public string CharacterSet { get; init; } =
         "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン" +
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";

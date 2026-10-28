@@ -15,15 +15,10 @@ public partial class SecondViewModel : ObservableObject
         Entity = entity;
         _navigator = navigator;
         _matrixTransition = matrixTransition;
-        GoBack = new AsyncRelayCommand(GoBackView);
     }
 
     public Entity Entity { get; }
 
-    public ICommand GoBack { get; }
-
-    private async Task GoBackView()
-    {
-        await _matrixTransition.GoBackWithMatrixAsync(_navigator, this);
-    }
+    [RelayCommand]
+    private Task GoBack() => _matrixTransition.GoBackWithMatrixAsync(_navigator, this);
 }

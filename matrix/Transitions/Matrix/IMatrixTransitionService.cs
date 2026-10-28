@@ -71,14 +71,13 @@ public sealed class MatrixTransitionService : IMatrixTransitionService
 
         var outgoing = _contentGetter();
 
-        // Start overlay BEFORE navigation to hide the flash
+        // Start overlay BEFORE navigation so the page swap is masked.
         IsTransitioning = true;
         await _overlay.PrepareTransitionAsync(outgoing, options);
 
-        // Perform navigation (page is hidden by overlay)
         await navigator.NavigateViewModelAsync<TViewModel>(sender!, data: data);
 
-        // Small delay to ensure new content is rendered
+        // One-frame yield so the incoming content is laid out before we fade it in.
         await Task.Delay(16);
 
         var incoming = _contentGetter();
@@ -114,7 +113,6 @@ public sealed class MatrixTransitionService : IMatrixTransitionService
 
         var outgoing = _contentGetter();
 
-        // Start overlay BEFORE navigation to hide the flash
         IsTransitioning = true;
         await _overlay.PrepareTransitionAsync(outgoing, options);
 
@@ -153,16 +151,10 @@ public sealed class MatrixTransitionService : IMatrixTransitionService
         }
         catch (TaskCanceledException)
         {
-            // Ignore
         }
         finally
         {
             IsTransitioning = false;
         }
-    }
-
-    public void StopLoop()
-    {
-        _cts?.Cancel();
     }
 }

@@ -13,7 +13,8 @@ public sealed partial class Shell : UserControl, IContentControlProvider
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // Wait for Host to be available (it's set after NavigateAsync completes)
+        // App.Host is assigned only after NavigateAsync<Shell>() returns,
+        // so we wait until the host is available before resolving services.
         var app = (App)Application.Current;
         while (app.Host == null)
         {

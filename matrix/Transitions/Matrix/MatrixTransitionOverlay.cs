@@ -10,6 +10,7 @@ public sealed class MatrixTransitionOverlay : SKCanvasElement
 {
     private readonly MatrixRainRenderer _renderer = new();
     private readonly Stopwatch _stopwatch = new();
+    private readonly DispatcherTimer _frameTimer = new();
     private TaskCompletionSource<bool>? _completionSource;
     private FrameworkElement? _outgoingElement;
     private FrameworkElement? _incomingElement;
@@ -20,11 +21,29 @@ public sealed class MatrixTransitionOverlay : SKCanvasElement
     public MatrixTransitionOverlay()
     {
         Canvas.SetZIndex(this, int.MaxValue);
-        IsHitTestVisible = false;
+        IsHitTestVisible = true;
         Visibility = Visibility.Collapsed;
 
         _renderer.PhaseChanged += OnPhaseChanged;
         _renderer.TransitionCompleted += OnTransitionCompleted;
+
+        PointerMoved += OnPointerMoved;
+        PointerExited += OnPointerExited;
+
+        // ~120fps cap.
+        _frameTimer.Interval = TimeSpan.FromMilliseconds(8);
+        _frameTimer.Tick += (_, _) => Invalidate();
+    }
+
+    private void OnPointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var point = e.GetCurrentPoint(this);
+        _renderer.SetCursorPosition((float)point.Position.X, (float)point.Position.Y);
+    }
+
+    private void OnPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _renderer.SetCursorPosition(-1000, -1000);
     }
 
     protected override void RenderOverride(SKCanvas canvas, Size area)
@@ -38,18 +57,15 @@ public sealed class MatrixTransitionOverlay : SKCanvasElement
         float delta = (float)_stopwatch.Elapsed.TotalMilliseconds;
         _stopwatch.Restart();
 
-        // Update size if changed
         _renderer.UpdateSize((float)area.Width, (float)area.Height);
-
         _renderer.Update(delta);
 
-        // Black background for the matrix effect
         canvas.Clear(new SKColor(0, 0, 0, 200));
         _renderer.Render(canvas);
 
-        if (_isRunning)
+        if (!_isRunning)
         {
-            Invalidate();
+            _frameTimer.Stop();
         }
     }
 
@@ -189,6 +205,7 @@ public sealed class MatrixTransitionOverlay : SKCanvasElement
         Visibility = Visibility.Visible;
         UpdateLayout();
 
+        // Yield a frame so layout can resolve before measuring.
         await Task.Delay(16);
 
         var parent = Parent as FrameworkElement;
@@ -206,12 +223,13 @@ public sealed class MatrixTransitionOverlay : SKCanvasElement
         _isRunning = true;
         _stopwatch.Restart();
         _renderer.Start(continuous);
+        _frameTimer.Start();
         Invalidate();
     }
 
     private void OnPhaseChanged(TransitionPhase phase)
     {
-        // Skip page animations in loop mode (no elements)
+        // Loop mode (no in/out elements) has nothing to animate.
         if (_outgoingElement == null && _incomingElement == null) return;
 
         DispatcherQueue.TryEnqueue(() =>
