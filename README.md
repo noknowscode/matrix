@@ -1,3 +1,5 @@
+> **Moved to uno-lab.** This project now lives in the `matrix/` folder of [noknowscode/uno-lab](https://github.com/noknowscode/uno-lab/tree/main/matrix) (private). This repository is archived and kept for its history.
+
 # Matrix Rain
 
 A Matrix-style "digital rain" page transition. The characters scatter away from the mouse pointer, and the rain carries you between pages.
